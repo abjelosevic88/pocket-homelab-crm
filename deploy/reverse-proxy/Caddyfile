@@ -1,0 +1,4 @@
+# Pocket CRM behind Caddy.
+crm.example.com {
+	reverse_proxy pocket-crm:8080
+}
