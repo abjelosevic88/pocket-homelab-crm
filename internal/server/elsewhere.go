@@ -92,6 +92,9 @@ func (s *Server) handleElsewhere(w http.ResponseWriter, r *http.Request) {
 				sec.State, sec.Detail = "error", j.a.name+" did not answer: "+err.Error()
 			} else {
 				sec.State, sec.Items = "ok", items
+				if sec.Items == nil {
+					sec.Items = []elseItem{}
+				}
 			}
 			out[i] = sec
 		}(i, j, sec, sib)
@@ -144,8 +147,9 @@ func (s *Server) mailWith(ctx context.Context, sib *siblingConn, d *store.Deal) 
 func (s *Server) meetingsWith(ctx context.Context, sib *siblingConn, d *store.Deal) ([]elseItem, error) {
 	var out []elseItem
 	seen := map[string]bool{}
-	for _, q := range []string{d.ContactEmail, d.ContactName, d.Company, d.Title} {
-		if strings.TrimSpace(q) == "" {
+	// who they are, not what the deal is called: a title like "Website" would match every meeting
+	for _, q := range []string{d.ContactEmail, d.ContactName, d.Company} {
+		if len([]rune(strings.TrimSpace(q))) < 3 {
 			continue
 		}
 		v, err := getJSONFrom(ctx, sib, "/api/v1/search", url.Values{"q": {q}})

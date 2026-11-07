@@ -261,7 +261,7 @@ function Elsewhere({ deal }: { deal: Deal }) {
     return () => { alive = false }
   }, [deal.id, deal.contact_email, deal.company, deal.contact_name])
   if (!secs) return <section><div className="sec-head"><h3>From your other apps</h3></div><div className="skeleton" style={{ height: 64 }} /></section>
-  const shown = secs.filter(s => s.state !== 'none' || s.items.length)
+  const shown = secs.map(s => ({ ...s, items: s.items || [] })).filter(s => s.state !== 'none' || s.items.length)
   const off = shown.filter(s => s.state === 'off')
   return (
     <section>

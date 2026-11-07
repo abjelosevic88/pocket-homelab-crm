@@ -151,6 +151,11 @@ func TestAppsWithoutCoreAreExplained(t *testing.T) {
 		t.Fatalf("elsewhere: %v", l)
 	}
 	for _, x := range l {
+		if x.(map[string]any)["items"] == nil {
+			t.Fatalf("items must be a list, never null: %v", x)
+		}
+	}
+	for _, x := range l {
 		if st := x.(map[string]any)["state"]; st == "ok" {
 			t.Fatalf("an app answered without being connected: %v", x)
 		}
