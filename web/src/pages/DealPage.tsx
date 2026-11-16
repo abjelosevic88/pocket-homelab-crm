@@ -17,7 +17,7 @@ import { Confirm, Empty, Loading, type MenuItem, MenuButton, Spinner, errMsg, us
 
 const MAKE: { target: string; label: string }[] = [
   { target: 'email', label: 'Email' }, { target: 'event', label: 'Meeting' }, { target: 'task', label: 'Task' }, { target: 'note', label: 'Note' },
-  { target: 'signing', label: 'To sign' }, { target: 'project', label: 'Project' }, { target: 'invoice', label: 'Invoice' },
+  { target: 'signing', label: 'To sign' }, { target: 'project', label: 'Project' }, { target: 'invoice', label: 'Invoice' }, { target: 'booking', label: 'Booking link' },
 ]
 
 export default function DealPage() {
@@ -250,6 +250,8 @@ function Timeline({ deal, acts, onLog }: { deal: Deal; acts: Activity[]; onLog: 
   )
 }
 
+const BOOKING_STATE: Record<string, string> = { pending: 'to confirm', confirmed: 'confirmed', declined: 'said no', cancelled: 'cancelled', done: 'happened', no_show: 'didn’t come' }
+
 /** What the other apps know about the person, read live, each on its own. */
 function Elsewhere({ deal }: { deal: Deal }) {
   const appState = useAppState()
@@ -272,7 +274,7 @@ function Elsewhere({ deal }: { deal: Deal }) {
           <span className="app-off-ico"><Icon name="link" size={15} /></span>
           <div className="grow">
             <div className="app-off-h">Not connected yet</div>
-            <div className="muted small">{off.map((s, i) => <span key={s.app} title={offTitle(appState(s.app).app, s.app)}>{i ? ', ' : ''}{APP_INFO[s.app].name}</span>)} — with them, the emails, meetings, form answers and invoices you have with this person show here. <Link to="/settings/apps">Connected apps</Link></div>
+            <div className="muted small">{off.map((s, i) => <span key={s.app} title={offTitle(appState(s.app).app, s.app)}>{i ? ', ' : ''}{APP_INFO[s.app].name}</span>)} — with them, the emails, meetings, form answers, invoices and bookings you have with this person show here. <Link to="/settings/apps">Connected apps</Link></div>
           </div>
         </div>}
         {shown.map(s => {
@@ -281,20 +283,21 @@ function Elsewhere({ deal }: { deal: Deal }) {
           if (s.state === 'none') return null
           return (
             <div key={s.app} className="else-sec">
-              <div className="else-h"><Icon name={APP_INFO[s.app].icon} size={14} />{s.name}<span className="muted small">· {s.items.length ? s.items.length : 'nothing'} {s.app === 'mail' ? 'with them' : s.app === 'calendar' ? 'about them' : s.app === 'forms' ? 'from them' : 'for them'}</span></div>
+              <div className="else-h"><Icon name={APP_INFO[s.app].icon} size={14} />{s.name}<span className="muted small">· {s.items.length ? s.items.length : 'nothing'} {s.app === 'mail' || s.app === 'booking' ? 'with them' : s.app === 'calendar' ? 'about them' : s.app === 'forms' ? 'from them' : 'for them'}</span></div>
               {s.items.slice(0, 6).map((it, i) => (
-                <a key={i} className="else-row" href={it.url || undefined} target="_blank" rel="noreferrer">
+                <a key={i} className={`else-row ${it.next ? 'else-next' : ''}`} href={it.url || undefined} target="_blank" rel="noreferrer">
                   {it.kind === 'email' && <Icon name={it.out ? 'send' : 'inbox'} size={13} />}
+                  {it.next && <span className="else-next-tag">Next</span>}
                   <span className="grow min0"><span className="ellipsis block-line">{it.title}</span>{it.body && <span className="muted tiny ellipsis block-line">{it.body}</span>}</span>
                   {it.amount && <span className="tnum small">{it.amount}</span>}
-                  {it.state && <span className={`state st-${it.state}`}>{it.state}</span>}
+                  {it.state && <span className={`state st-${it.state}`}>{it.kind === 'booking' ? BOOKING_STATE[it.state] || it.state : it.state}</span>}
                   <span className="muted tiny">{it.at ? fmtDate(it.at.slice(0, 10), false) : ''}</span>
                 </a>
               ))}
             </div>
           )
         })}
-        {shown.every(s => s.state === 'none') && <p className="muted small">Add their email or company to see their emails, meetings, form answers and invoices here.</p>}
+        {shown.every(s => s.state === 'none') && <p className="muted small">Add their email or company to see their emails, meetings, form answers, invoices and bookings here.</p>}
       </div>
     </section>
   )

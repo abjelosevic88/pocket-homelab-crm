@@ -77,6 +77,7 @@ Set `CORE_URL` and `CORE_REGISTRATION_KEY` and CRM joins the box: people sign in
 | Pocket Projects | the project, when a deal is won | — | `projects:read`, `projects:write` |
 | Pocket Invoicing | a draft invoice when a deal is won; their invoices and what is paid | — | `invoices:read`, `invoices:write` |
 | Pocket Forms | answers to your forms become leads in one click | add leads by hand | `forms:read` |
+| Pocket Booking | the times they booked with you (the next one marked); a booking link made just for them, with their name and email filled in and the deal as the note | — | `booking:read`, `booking:write` |
 | Pocket AI | next step, summary, follow-up email; the Ask button on every page | your own OpenAI key, or no AI | inference |
 
 **Nothing depends on another app.** Each app's state is checked per person — connected, switched off here, switched off in Pocket Core, not on this box, too old — and what needs it is shown greyed out with one line saying why and what to do, never hidden. When winning a deal, each step runs on its own, so a missing app never stops the win.

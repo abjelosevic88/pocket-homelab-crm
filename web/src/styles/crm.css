@@ -325,6 +325,11 @@ a.list-row:hover, .list-row:has(> a.row-main:hover) { background: var(--hover); 
 .state.st-paid, .state.st-completed, .state.st-signed, .state.st-done { background: var(--success-soft); color: var(--success); }
 .state.st-overdue, .state.st-declined, .state.st-voided, .state.st-expired { background: var(--danger-soft); color: var(--danger); }
 .state.st-sent, .state.st-waiting, .state.st-opened { background: var(--accent-soft); color: var(--accent-ink); }
+.state.st-confirmed { background: var(--success-soft); color: var(--success); }
+.state.st-pending { background: var(--warning-soft, var(--accent-soft)); color: var(--warning, var(--accent-ink)); }
+.state.st-cancelled, .state.st-no_show { background: var(--surface-2); color: var(--muted); }
+.else-row.else-next { background: var(--accent-soft); }
+.else-next-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent-ink); flex-shrink: 0; }
 .side-card { padding: 14px; display: grid; gap: 8px; }
 .side-h { margin: 0; font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .who-row { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13.5px; min-width: 0; }

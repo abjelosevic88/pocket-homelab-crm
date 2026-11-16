@@ -19,8 +19,8 @@ Money is kept in **cents**: `value` is `450000` for 4,500.00. Every deal also ca
 | `POST /deals/{id}/move` | `{stage_id, before?, after?, lost_reason?, note?}` — `before`/`after` are the positions of the cards around it on the board |
 | `POST /deals/{id}/step/done` | tick off the next step: `{kind?: step\|call\|meeting\|email, note?, next_action?, next_due?}` |
 | `POST /deals/{id}/won` | win it and take it on: `{note?, project?, invoice?, task?, contact?, team_id?, name?, due?}` → `{deal, steps: [{target, made?, error?}]}` (each step on its own) |
-| `POST /deals/{id}/make` | make one thing in another app: `{target: contact\|task\|event\|note\|email\|signing\|project\|invoice, …}` → Made |
-| `GET /deals/{id}/elsewhere` | what the other apps know about the person, live: `[{app, name, state: ok\|off\|error\|none, detail, fix, items}]` |
+| `POST /deals/{id}/make` | make one thing in another app: `{target: contact\|task\|event\|note\|email\|signing\|project\|invoice\|booking, …}` → Made (`booking`: `{type_id?, days?: 14, notes?}` — a personal booking link in Pocket Booking for the deal's person, the deal's title as the note; the Made's `url` is the link) |
+| `GET /deals/{id}/elsewhere` | what the other apps know about the person, live: `[{app, name, state: ok\|off\|error\|none, detail, fix, items}]` — Mail, Calendar, Forms, Invoicing and Booking (bookings by the person's email, upcoming first with `next: true` on the next one) |
 | `GET /deals/{id}/meeting.ics` | `?date=&time=&minutes=&title=&location=&log=1` — a meeting as a calendar file (when Pocket Calendar is not connected) |
 | `POST /deals/{id}/sync` | look now at what the deal has in the other apps (signed? paid? ticked off?) |
 | `POST /deals/{id}/ai` | `{want: next\|summary\|email, hint?}` |
@@ -49,6 +49,7 @@ made_count, activities`. `contact_ref`/`company_ref` are card ids in Pocket Cont
 | `GET /reports` | `?months=12` → months, funnel, lost reasons, sources, days to win, average won |
 | `GET /tags` | |
 | `GET /leads`, `POST /leads/{answer id}/take` | answers to Pocket Forms not yet deals; take one as a deal |
+| `GET /apps/options/{teams\|templates\|booking-types}` | what to pick from in an app: Projects' teams, Sign's templates, Booking's open booking pages `[{id, name, emoji, durations, url}]` |
 | `GET /apps` | per linked app: `{slug, name, mode, via, state: on\|partly\|off\|link_off\|missing\|old\|no_core\|not_set_up\|error, detail, fix, on: [scopes], open_url}` |
 | `GET /export.json`, `GET /export.csv`, `POST /import` | a Pocket CRM export (idempotent) or a CSV from Pipedrive, HubSpot, Zoho or a spreadsheet |
 
@@ -64,7 +65,8 @@ CRM offers two scopes:
   `PUT /deals/{id}` (only deals that app added), `POST /deals/{id}/activities` (a line on any deal's timeline)
 
 CRM uses: `contacts:read/write`, `mail:read`, `mail:send`, `calendar:read/write`, `tasks:read/write`, `notes:write`,
-`signing:read/write`, `projects:read/write`, `invoices:read/write`, `forms:read`, and Pocket AI.
+`signing:read/write`, `projects:read/write`, `invoices:read/write`, `forms:read`, `booking:read/write` (Pocket Booking:
+`GET /lookup?email=`, `GET /types`, `POST /invites`), and Pocket AI.
 
 ## Events
 

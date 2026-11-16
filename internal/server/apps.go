@@ -20,7 +20,8 @@ import (
 // next step as a task in Pocket Tasks, a meeting in Pocket Calendar, the deal
 // as a note in Pocket Notes, an email from Pocket Mail, a proposal or
 // contract from a Pocket Sign template, and — once won — the project in
-// Pocket Projects and a draft invoice in Pocket Invoicing. Each thing made is
+// Pocket Projects and a draft invoice in Pocket Invoicing; a personal
+// booking link from Pocket Booking for the person to pick a time. Each thing made is
 // remembered with a link to it; a failed try says why in plain words.
 //
 // Nothing here is needed for the deal itself: when an app is not on the box,
@@ -88,7 +89,7 @@ func fmtMoney(cents int64, cur string) string {
 }
 
 type makeIn struct {
-	Target     string `json:"target"` // contact | task | event | note | email | signing | project | invoice
+	Target     string `json:"target"` // contact | task | event | note | email | signing | project | invoice | booking
 	Title      string `json:"title"`
 	Notes      string `json:"notes"`
 	Date       string `json:"date"`
@@ -104,16 +105,18 @@ type makeIn struct {
 	Send       bool   `json:"send"`
 	Timeline   bool   `json:"timeline"`
 	ContactRef string `json:"contact_ref"` // contact: link this card instead of looking
+	TypeID     int64  `json:"type_id"`     // booking: which booking page (0 = the first open one)
+	Days       int    `json:"days"`        // booking: how long the link works
 }
 
 var makeTargets = map[string]pocketApp{"contact": appContacts, "task": appTasks, "event": appCalendar, "note": appNotes,
-	"email": appMail, "signing": appSign, "project": appProjects, "invoice": appInvoicing}
+	"email": appMail, "signing": appSign, "project": appProjects, "invoice": appInvoicing, "booking": appBooking}
 
 // make makes one thing for a deal in another app and remembers it.
 func (s *Server) make(ctx context.Context, c *clients, d *store.Deal, in makeIn) (*store.Made, error) {
 	a, ok := makeTargets[in.Target]
 	if !ok {
-		return nil, &userErr{"make a contact, task, meeting, note, email, document to sign, project or invoice"}
+		return nil, &userErr{"make a contact, task, meeting, note, email, document to sign, project, invoice or booking link"}
 	}
 	m := &store.Made{DealID: d.ID, Target: in.Target, App: a.slug}
 	var (
@@ -139,6 +142,8 @@ func (s *Server) make(ctx context.Context, c *clients, d *store.Deal, in makeIn)
 		res, path, err = s.makeProject(ctx, c, d, in)
 	case "invoice":
 		res, path, err = s.makeInvoice(ctx, c, d, in)
+	case "booking":
+		res, err = s.makeBookingLink(ctx, c, d, in)
 	}
 	if err != nil {
 		return nil, err
@@ -149,6 +154,10 @@ func (s *Server) make(ctx context.Context, c *clients, d *store.Deal, in makeIn)
 		m.State = str(res, "status")
 		if in.Target == "invoice" && m.Title != "" && !strings.HasPrefix(m.Title, "Invoice") {
 			m.Title = "Invoice " + m.Title
+		}
+		if in.Target == "booking" { // the link the person books with: to copy again from the deal
+			m.Title, m.URL = "Booking link: "+firstNonEmpty(str(res, "type"), "a time with you"), str(res, "url")
+			in.Due = str(res, "expires_at")
 		}
 		if sib, _ := c.conn(ctx, a, a.scopes[len(a.scopes)-1]); sib != nil && sib.public != "" && m.Ref != "" && path != "" {
 			m.URL = strings.TrimRight(sib.public, "/") + path
@@ -186,6 +195,11 @@ func (s *Server) madeLine(ctx context.Context, d *store.Deal, m *store.Made, in 
 		a.Title = "Project started: " + m.Title
 	case "invoice":
 		a.Title = "Draft invoice made: " + m.Title
+	case "booking":
+		a.Title = m.Title + " (made for " + firstNonEmpty(d.ContactName, d.ContactEmail, "them") + ")"
+		if exp := in.Due; len(exp) >= 10 { // make() puts the link's end here
+			a.Body = "Works once, until " + exp[:10]
+		}
 	default:
 		return
 	}
@@ -750,6 +764,35 @@ func (s *Server) makeInvoice(ctx context.Context, c *clients, d *store.Deal, in 
 	return res, "/invoices/" + idOf(res), nil
 }
 
+// ---- Pocket Booking ----
+
+// makeBookingLink makes a personal booking link: it books once, with the
+// person's name and email filled in and the deal as the note.
+func (s *Server) makeBookingLink(ctx context.Context, c *clients, d *store.Deal, in makeIn) (map[string]any, error) {
+	if d.ContactName == "" && d.ContactEmail == "" {
+		return nil, &userErr{"say who the deal is with first: the link is made for them"}
+	}
+	sib, err := c.conn(ctx, appBooking, scopeBookingWrite)
+	if err != nil {
+		return nil, err
+	}
+	days := in.Days
+	if days <= 0 {
+		days = 14
+	}
+	days = min(days, 90)
+	note := firstNonEmpty(strings.TrimSpace(in.Notes), d.Title)
+	res, err := postJSONTo(ctx, sib, "/api/v1/invites", map[string]any{"type_id": max(in.TypeID, 0), "name": firstNonEmpty(d.ContactName, d.ContactEmail),
+		"email": d.ContactEmail, "note": clip(note, 500), "days": days})
+	if err != nil {
+		return nil, err
+	}
+	if str(res, "url") == "" {
+		return nil, fmt.Errorf("it gave no link back")
+	}
+	return res, nil
+}
+
 // ---- the handlers ----
 
 func (s *Server) ownDeal(w http.ResponseWriter, r *http.Request) (*store.Deal, bool) {
@@ -906,6 +949,8 @@ func (s *Server) handleAppOptions(w http.ResponseWriter, r *http.Request) {
 		a, scope, path, key = appProjects, scopeProjectsRead, "/api/v1/teams", "teams"
 	case "templates":
 		a, scope, path, key = appSign, scopeSigningRead, "/api/v1/templates", "templates"
+	case "booking-types":
+		a, scope, path, key = appBooking, scopeBookingRead, "/api/v1/types", "types"
 	default:
 		writeErr(w, http.StatusNotFound, "unknown list")
 		return
@@ -925,6 +970,12 @@ func (s *Server) handleAppOptions(w http.ResponseWriter, r *http.Request) {
 		o := map[string]any{"id": num(x, "id"), "name": str(x, "name", "title"), "key": str(x, "key")}
 		if key == "templates" {
 			o["roles"] = x["roles"]
+		}
+		if key == "types" { // booking pages: only the open ones take bookings
+			if st := str(x, "status"); st != "" && st != "open" {
+				continue
+			}
+			o["emoji"], o["durations"], o["url"] = str(x, "emoji"), x["durations"], str(x, "url")
 		}
 		out = append(out, o)
 	}

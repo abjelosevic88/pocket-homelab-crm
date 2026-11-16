@@ -11,15 +11,16 @@ export const APP_INFO: Record<AppSlug, { name: string; icon: string; what: strin
   projects: { name: 'Pocket Projects', icon: 'layers', what: 'projects' },
   invoicing: { name: 'Pocket Invoicing', icon: 'receipt', what: 'invoices' },
   forms: { name: 'Pocket Forms', icon: 'list', what: 'leads from your forms' },
+  booking: { name: 'Pocket Booking', icon: 'calendar-check', what: 'times booked with you' },
 }
 
 /** Which app makes each kind of linked thing. */
 export const TARGET_APP: Record<string, AppSlug> = {
-  contact: 'contacts', task: 'tasks', event: 'calendar', note: 'notes', email: 'mail', signing: 'sign', project: 'projects', invoice: 'invoicing', answer: 'forms',
+  contact: 'contacts', task: 'tasks', event: 'calendar', note: 'notes', email: 'mail', signing: 'sign', project: 'projects', invoice: 'invoicing', answer: 'forms', booking: 'booking',
 }
 
 export const TARGET_LABEL: Record<string, string> = {
-  contact: 'Contact', task: 'Task', event: 'Meeting', note: 'Note', email: 'Email', signing: 'To sign', project: 'Project', invoice: 'Invoice', answer: 'Form answer',
+  contact: 'Contact', task: 'Task', event: 'Meeting', note: 'Note', email: 'Email', signing: 'To sign', project: 'Project', invoice: 'Invoice', answer: 'Form answer', booking: 'Booking link',
 }
 
 /** Short words for a state that does not work, for a greyed-out button. */

@@ -1,6 +1,7 @@
 // The sheets behind a deal's buttons: a step done, won, lost, a line on the
-// timeline, and making something in another app — with a way that works
-// without that app (a calendar file, your own email app) when it is not there.
+// timeline, and making something in another app (a booking link from Pocket
+// Booking too) — with a way that works without that app (a calendar file,
+// your own email app) when it is not there.
 import { useEffect, useState } from 'react'
 import { api, V1 } from '../lib/api'
 import { useApp } from '../lib/app-context'
@@ -11,11 +12,11 @@ import type { ActivityKind, Deal, Made } from '../lib/types'
 import { AppOff, offTitle } from './Apps'
 import { Icon } from './icons'
 import { Select } from './Select'
-import { Field, Modal, Segmented, Spinner, Switch, errMsg, useToast } from './ui'
+import { CopyField, Field, Modal, Segmented, Spinner, Switch, errMsg, useToast } from './ui'
 
-type Opt = { id: number; name: string; key?: string }
+type Opt = { id: number; name: string; key?: string; emoji?: string; durations?: number[] }
 
-function useOptions(what: 'teams' | 'templates', active: boolean) {
+function useOptions(what: 'teams' | 'templates' | 'booking-types', active: boolean) {
   const [list, setList] = useState<Opt[] | null>(null)
   const [err, setErr] = useState('')
   useEffect(() => {
@@ -255,9 +256,9 @@ export function WonSheet({ deal, onClose, onDone }: { deal: Deal; onClose: () =>
 
 // ---- in another app ----
 
-const TITLES: Record<string, string> = { task: 'Make a task', event: 'Plan a meeting', note: 'Save as a note', email: 'Send an email', signing: 'Send to sign', project: 'Start a project', invoice: 'Make a draft invoice', contact: 'Link to Pocket Contacts' }
+const TITLES: Record<string, string> = { task: 'Make a task', event: 'Plan a meeting', note: 'Save as a note', email: 'Send an email', signing: 'Send to sign', project: 'Start a project', invoice: 'Make a draft invoice', contact: 'Link to Pocket Contacts', booking: 'Send a booking link' }
 
-export const MAKE_SCOPE: Record<string, string> = { contact: 'contacts:read', task: 'tasks:write', event: 'calendar:write', note: 'notes:write', email: 'mail:send', signing: 'signing:write', project: 'projects:write', invoice: 'invoices:write' }
+export const MAKE_SCOPE: Record<string, string> = { contact: 'contacts:read', task: 'tasks:write', event: 'calendar:write', note: 'notes:write', email: 'mail:send', signing: 'signing:write', project: 'projects:write', invoice: 'invoices:write', booking: 'booking:write' }
 
 export function MakeSheet({ deal, target, onClose, onDone }: { deal: Deal; target: string; onClose: () => void; onDone: (m?: Made) => void }) {
   const { settings } = useApp()
@@ -270,9 +271,15 @@ export function MakeSheet({ deal, target, onClose, onDone }: { deal: Deal; targe
     title: target === 'task' ? (deal.next_action || `Follow up with ${deal.contact_name || deal.company || 'them'}`) : target === 'event' ? `Meeting with ${who(deal) || deal.title}` : target === 'note' ? deal.title : '',
     notes: '', due: deal.next_due || addDays(todayISO(), settings?.action_days || 2), date: addDays(todayISO(), 1), time: '10:00', minutes: settings?.meeting_minutes || 60, location: '',
     to: deal.contact_email, subject: deal.title, body: '', template_id: 0, send: true, timeline: true, team_id: settings?.project_team || 0,
+    type_id: 0, days: 14,
   })
   const templates = useOptions('templates', target === 'signing' && st.ok)
   const teams = useOptions('teams', target === 'project' && st.ok)
+  const pages = useOptions('booking-types', target === 'booking' && st.ok)
+  const [link, setLink] = useState<Made | null>(null)
+  useEffect(() => {
+    if (pages.list?.length && !f.type_id) setF(x => ({ ...x, type_id: pages.list![0].id }))
+  }, [pages.list, f.type_id])
   const [busy, setBusy] = useState(false)
   const [drafting, setDrafting] = useState(false)
   const draft = async () => {
@@ -288,6 +295,7 @@ export function MakeSheet({ deal, target, onClose, onDone }: { deal: Deal; targe
     try {
       const m = await api.post<Made>(`${V1}/deals/${deal.id}/make`, { target, ...f, time: target === 'event' ? f.time : '' })
       announceChange()
+      if (target === 'booking') { setLink(m); return }
       toast(target === 'email' ? 'Sent' : m.title ? `Done: ${m.title}` : 'Done')
       onDone(m)
     } catch (err) { toast(errMsg(err), 'err') } finally { setBusy(false) }
@@ -302,13 +310,29 @@ export function MakeSheet({ deal, target, onClose, onDone }: { deal: Deal; targe
   }
   const fallback = !st.ok && (target === 'event' || target === 'email')
   const canGo = st.ok && !busy && !(target === 'signing' && !f.template_id) && !(target === 'email' && (!f.to || !f.body)) && !(target === 'event' && !f.date)
+    && !(target === 'booking' && (!pages.list?.length || !(deal.contact_name || deal.contact_email)))
+  const first = deal.contact_name.split(' ')[0] || 'them'
+  if (link) {
+    const mail = deal.contact_email ? `mailto:${encodeURIComponent(deal.contact_email)}?subject=${encodeURIComponent(`Book a time: ${deal.title}`)}&body=${encodeURIComponent(`Hi ${first},\n\nPick a time that suits you here:\n${link.url}\n`)}` : ''
+    return (
+      <Modal title="Your booking link" onClose={() => onDone(link)} size="sm" footer={<>
+        {mail && <a className="btn" href={mail}><Icon name="mail" size={15} />Email it</a>}
+        <button type="button" className="btn primary" onClick={() => onDone(link)}>Done</button>
+      </>}>
+        <div className="stack">
+          <p className="muted small">A link just for {deal.contact_name || deal.contact_email}: it books once, with their name{deal.contact_email ? ' and email' : ''} filled in. It is on the deal too, under “In your other apps”.</p>
+          <CopyField value={link.url} label="Booking link" />
+        </div>
+      </Modal>
+    )
+  }
   return (
     <Modal title={TITLES[target]} onClose={onClose} size={target === 'email' ? '' : 'sm'} footer={<>
       <button type="button" className="btn" onClick={onClose}>Cancel</button>
       {fallback && target === 'event' && <a className="btn primary" href={icsURL} download onClick={() => setTimeout(() => { announceChange(); onDone() }, 300)}><Icon name="download" size={15} />Download for your calendar</a>}
       {fallback && target === 'email' && <a className="btn primary" href={mailto} onClick={() => setTimeout(logEmail, 300)}><Icon name="external" size={15} />Open in your email app</a>}
       {!fallback && <button type="button" className="btn primary" onClick={() => go()} disabled={!canGo}>
-        {busy ? <Spinner /> : <Icon name={APP_INFO[slug].icon} size={15} />}{target === 'email' ? 'Send' : target === 'signing' ? (f.send ? 'Send it' : 'Make the document') : 'Make it'}
+        {busy ? <Spinner /> : <Icon name={APP_INFO[slug].icon} size={15} />}{target === 'email' ? 'Send' : target === 'signing' ? (f.send ? 'Send it' : 'Make the document') : target === 'booking' ? 'Make the link' : 'Make it'}
       </button>}
     </>}>
       <form className="stack" onSubmit={go}>
@@ -343,6 +367,17 @@ export function MakeSheet({ deal, target, onClose, onDone }: { deal: Deal; targe
         {target === 'project' && st.ok && <>
           <Field label="Name"><input value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder={deal.title} autoFocus /></Field>
           <Field label="Team" group help={teams.err}><Select ariaLabel="Team" value={String(f.team_id || '')} onChange={v => setF({ ...f, team_id: Number(v) })} placeholder={teams.list ? 'Projects’ default' : 'Loading…'} clearLabel="Projects’ default" options={(teams.list || []).map(t => ({ value: String(t.id), label: t.name, hint: t.key }))} /></Field>
+        </>}
+        {target === 'booking' && st.ok && <>
+          {!(deal.contact_name || deal.contact_email) ? <p className="muted small">Say who the deal is with first: the link is made for them.</p>
+            : <p className="muted small">A link just for {deal.contact_name || deal.contact_email} to pick a time: it books once, with their name{deal.contact_email ? ' and email' : ''} filled in.{!deal.contact_email && ' They type their email when they book.'}</p>}
+          <Field label="Booking page" group help={pages.err || (pages.list && !pages.list.length ? 'No open booking page in Pocket Booking yet: make one there first.' : undefined)}>
+            {pages.list && pages.list.length === 1 ? <div className="small">{pages.list[0].emoji ? `${pages.list[0].emoji} ` : ''}{pages.list[0].name}</div>
+              : <Select ariaLabel="Booking page" value={String(f.type_id || '')} onChange={v => setF({ ...f, type_id: Number(v) })} placeholder={pages.list ? 'No open booking pages' : 'Loading…'}
+                options={(pages.list || []).map(t => ({ value: String(t.id), label: `${t.emoji ? t.emoji + ' ' : ''}${t.name}`, hint: t.durations?.length ? t.durations.map(m => `${m} min`).join(', ') : undefined }))} />}
+          </Field>
+          <Field label="Works for" group><Segmented size="sm" label="Works for" value={f.days} onChange={v => setF({ ...f, days: v })} options={[{ value: 7, label: '1 week' }, { value: 14, label: '2 weeks' }, { value: 30, label: '1 month' }]} /></Field>
+          <Field label="Note" help="Kept with the booking in Pocket Booking. Empty: the deal’s title."><input value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} placeholder={deal.title} /></Field>
         </>}
         {target === 'invoice' && <p className="muted small">One line for {fmtMoney(deal.value, deal.currency)} to {deal.company || deal.contact_name || 'them'} (added as a client when they are new). It stays a draft until you send it from Pocket Invoicing.</p>}
         {(target === 'task' || target === 'event' || target === 'project') && <Field label="Notes" help="Optional. A link back to the deal is added."><textarea rows={2} value={f.notes} onChange={e => setF({ ...f, notes: e.target.value })} /></Field>}

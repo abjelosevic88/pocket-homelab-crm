@@ -20,7 +20,7 @@ const TABS: { id: TabId; label: string; icon: string; sub: string }[] = [
   { id: 'general', label: 'General', icon: 'home', sub: 'Dates, times, your currency and the app title.' },
   { id: 'pipeline', label: 'Pipeline', icon: 'layers', sub: 'The stages a deal goes through, when a deal goes quiet, the reasons deals are lost, and what happens when one is won.' },
   { id: 'notifications', label: 'Notifications', icon: 'bell', sub: 'A morning note with the next steps due and the deals gone quiet.' },
-  { id: 'apps', label: 'Connected apps', icon: 'link', sub: 'Your contacts, mail, calendar, tasks, notes, documents to sign, projects, invoices and forms — what each deal can reach.' },
+  { id: 'apps', label: 'Connected apps', icon: 'link', sub: 'Your contacts, mail, calendar, tasks, notes, documents to sign, projects, invoices, forms and bookings — what each deal can reach.' },
   { id: 'ai', label: 'AI', icon: 'sparkles', sub: 'Who helps you: Pocket AI through Core, or your own OpenAI key.' },
   { id: 'profile', label: 'Profile', icon: 'user', sub: 'Your name, email and password.' },
   { id: 'people', label: 'People', icon: 'users', sub: 'Everyone who has an account on this box. Each person has their own deals.' },
@@ -259,6 +259,7 @@ const APPS: { slug: AppSlug; title: string; sub: string; token: string; port: st
   { slug: 'sign', title: 'Pocket Sign — proposals and contracts', sub: 'Send a proposal or a contract from your templates; the deal shows when it is signed.', token: 'Pocket Sign → Settings → API tokens', port: '8234' },
   { slug: 'projects', title: 'Pocket Projects — won deals become projects', sub: 'Start the project when a deal is won, with what was agreed as its description.', token: 'Pocket Projects → Settings → API tokens', port: '8196' },
   { slug: 'invoicing', title: 'Pocket Invoicing — invoices', sub: 'A draft invoice when a deal is won, and a client’s invoices (paid or not) on the deal.', token: 'Pocket Invoicing → Settings → API tokens', port: '8168' },
+  { slug: 'booking', title: 'Pocket Booking — times booked with you', sub: 'The times a deal’s person booked with you on the deal, and a booking link made just for them (their name and email filled in) to send.', token: 'Pocket Booking → Settings → API tokens', port: '8279' },
   { slug: 'forms', title: 'Pocket Forms — leads', sub: 'Answers to your forms (a brief, a quote request) become deals in one click, and show on the person’s deal.', token: 'Pocket Forms → Settings → API tokens', port: '8248' },
 ]
 

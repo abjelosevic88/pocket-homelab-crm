@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
@@ -138,7 +139,7 @@ func TestAppsWithoutCoreAreExplained(t *testing.T) {
 	}
 	d := a.ok(a.alice, "POST", "/api/v1/deals", map[string]any{"title": "Audit", "contact_email": "x@y.ba", "company": "Y"})
 	path := "/api/v1/deals/" + id(d)
-	for _, target := range []string{"contact", "task", "event", "note", "signing", "project", "invoice"} {
+	for _, target := range []string{"contact", "task", "event", "note", "signing", "project", "invoice", "booking"} {
 		body := map[string]any{"target": target, "date": "2099-01-02", "template_id": 1}
 		m := a.expect(400, a.alice, "POST", path+"/make", body)
 		if !strings.Contains(m["error"].(string), "Pocket") && !strings.Contains(m["error"].(string), "value") {
@@ -147,7 +148,7 @@ func TestAppsWithoutCoreAreExplained(t *testing.T) {
 	}
 	// the timeline from the other apps greys out each part on its own
 	_, _, l := a.call(a.alice, "GET", path+"/elsewhere", nil)
-	if len(l) != 4 {
+	if len(l) != 5 {
 		t.Fatalf("elsewhere: %v", l)
 	}
 	for _, x := range l {
@@ -285,6 +286,79 @@ func TestLinkScopes(t *testing.T) {
 			t.Errorf("bad scope %q", o.Scope)
 		}
 	}
+}
+
+func TestBookingOnADeal(t *testing.T) {
+	a := newApp(t, nil)
+	var invite map[string]any
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer btok" {
+			w.WriteHeader(401)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.Method + " " + r.URL.Path {
+		case "GET /api/v1/lookup":
+			if r.URL.Query().Get("email") != "ana@pekara.ba" {
+				t.Errorf("lookup asked for %q", r.URL.RawQuery)
+			}
+			io.WriteString(w, `{"email":"ana@pekara.ba","count":3,"last":"2026-01-05","next":"2099-01-05",
+				"bookings":[{"id":42,"title":"Viewing","status":"confirmed","start":"2099-03-02T10:00:00+01:00","end":"2099-03-02T11:00:00+01:00","time":"10:00","end_time":"11:00"},
+				{"id":41,"title":"Intro call","emoji":"📞","status":"cancelled","start":"2099-01-05T09:00:00+01:00","end":"2099-01-05T09:30:00+01:00"},
+				{"id":30,"title":"Intro call","status":"done","start":"2026-01-05T09:00:00+01:00","end":"2026-01-05T09:30:00+01:00"}],
+				"upcoming":[{"id":42,"title":"Viewing","status":"confirmed","start":"2099-03-02T10:00:00+01:00","end":"2099-03-02T11:00:00+01:00","time":"10:00","end_time":"11:00"}]}`)
+		case "GET /api/v1/types":
+			io.WriteString(w, `{"types":[{"id":3,"title":"Intro call","emoji":"📞","status":"open","durations":[30]},{"id":4,"title":"Old","status":"paused"}]}`)
+		case "POST /api/v1/invites":
+			_ = json.NewDecoder(r.Body).Decode(&invite)
+			w.WriteHeader(201)
+			io.WriteString(w, `{"id":9,"url":"https://booking.example/i/tok9","type":"Intro call","type_id":3,"expires_at":"2026-11-30T23:00:00Z"}`)
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer fake.Close()
+	a.ok(a.alice, "PUT", "/api/v1/settings", map[string]any{"booking_mode": "direct", "booking_url": fake.URL, "booking_token": "btok"})
+	d := a.ok(a.alice, "POST", "/api/v1/deals", map[string]any{"title": "Shop for the bakery", "contact_name": "Ana Marić", "contact_email": "ana@pekara.ba"})
+	path := "/api/v1/deals/" + id(d)
+	_, _, l := a.call(a.alice, "GET", path+"/elsewhere", nil)
+	var bk map[string]any
+	for _, x := range l {
+		if sec := x.(map[string]any); sec["app"] == "booking" {
+			bk = sec
+		}
+	}
+	items, _ := bk["items"].([]any)
+	if bk["state"] != "ok" || len(items) != 3 {
+		t.Fatalf("bookings on the deal: %v", bk)
+	}
+	first, second, last := items[0].(map[string]any), items[1].(map[string]any), items[2].(map[string]any)
+	if first["ref"] != "41" || first["state"] != "cancelled" || first["next"] == true || first["title"] != "📞 Intro call" ||
+		second["ref"] != "42" || second["next"] != true || second["body"] != "10:00–11:00" || second["url"] != fake.URL+"/bookings/42" ||
+		last["ref"] != "30" || last["next"] == true {
+		t.Fatalf("bookings in order: %v", items)
+	}
+	types := a.list(a.alice, "/api/v1/apps/options/booking-types")
+	if len(types) != 1 || types[0].(map[string]any)["name"] != "Intro call" {
+		t.Fatalf("booking pages: %v", types)
+	}
+	m := a.expect(201, a.alice, "POST", path+"/make", map[string]any{"target": "booking", "type_id": 3, "days": 7})
+	if m["url"] != "https://booking.example/i/tok9" || m["title"] != "Booking link: Intro call" || m["app"] != "booking" ||
+		invite["name"] != "Ana Marić" || invite["email"] != "ana@pekara.ba" || invite["note"] != "Shop for the bakery" || invite["type_id"] != 3.0 || invite["days"] != 7.0 {
+		t.Fatalf("booking link: %v sent %v", m, invite)
+	}
+	got := a.ok(a.alice, "GET", path, nil)
+	found := false
+	for _, x := range got["activities"].([]any) {
+		if act := x.(map[string]any); strings.HasPrefix(act["title"].(string), "Booking link: Intro call") && act["body"] == "Works once, until 2026-11-30" {
+			found = true
+		}
+	}
+	if !found || len(got["made"].([]any)) != 1 {
+		t.Fatalf("the link on the deal: %v %v", got["activities"], got["made"])
+	}
+	// Bob cannot make one on Alice's deal
+	a.expect(404, a.bob, "POST", path+"/make", map[string]any{"target": "booking"})
 }
 
 func TestSourceRefNeverTwice(t *testing.T) {

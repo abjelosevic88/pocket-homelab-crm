@@ -3,7 +3,7 @@ export interface APIToken { id: number; user_id: number; name: string; prefix: s
 
 export type ConnMode = 'core' | 'direct' | 'off'
 export type ConnVia = '' | 'core' | 'direct'
-export type AppSlug = 'contacts' | 'mail' | 'calendar' | 'tasks' | 'notes' | 'sign' | 'projects' | 'invoicing' | 'forms'
+export type AppSlug = 'contacts' | 'mail' | 'calendar' | 'tasks' | 'notes' | 'sign' | 'projects' | 'invoicing' | 'forms' | 'booking'
 
 type ConnFields = { [K in AppSlug as `${K}_mode`]: ConnMode } & { [K in AppSlug as `${K}_via`]: ConnVia } & { [K in AppSlug as `${K}_detail` | `${K}_url` | `${K}_token` | `${K}_public_url` | `${K}_open_url`]: string } & { [K in AppSlug as `${K}_configured`]: boolean }
 
@@ -46,7 +46,7 @@ export type AppStateName = 'on' | 'partly' | 'off' | 'link_off' | 'missing' | 'o
 
 export interface AppState { slug: AppSlug; name: string; reason: string; mode: ConnMode; via: ConnVia; state: AppStateName; detail: string; fix: string; on: string[]; open_url: string }
 
-export interface ElseItem { kind: 'email' | 'meeting' | 'answer' | 'invoice'; title: string; body?: string; at: string; url?: string; state?: string; amount?: string; out?: boolean; ref?: string }
+export interface ElseItem { kind: 'email' | 'meeting' | 'answer' | 'invoice' | 'booking'; title: string; body?: string; at: string; url?: string; state?: string; amount?: string; out?: boolean; next?: boolean; ref?: string }
 export interface ElseSection { app: AppSlug; name: string; state: 'ok' | 'off' | 'error' | 'none'; detail?: string; fix?: string; items: ElseItem[]; open_url?: string }
 
 export type Money = Record<string, number>

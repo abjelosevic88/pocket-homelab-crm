@@ -127,7 +127,7 @@ function Shell() {
     ...(stages || []).filter(s => s.kind === 'open').map(s => ({ id: `stage-${s.id}`, label: `Deals in ${s.name}`, icon: 'move', keywords: 'stage', run: () => navigate(`/deals?stage=${s.id}`) })),
     { id: 'settings', label: 'Settings', icon: 'settings', hint: ',', run: () => navigate('/settings') },
     { id: 'pipe-set', label: 'Settings: pipeline stages', icon: 'sliders', keywords: 'stages lost reasons currency', run: () => navigate('/settings/pipeline') },
-    { id: 'apps', label: 'Settings: connected apps', icon: 'link', keywords: 'contacts mail calendar tasks notes sign projects invoicing forms core', run: () => navigate('/settings/apps') },
+    { id: 'apps', label: 'Settings: connected apps', icon: 'link', keywords: 'contacts mail calendar tasks notes sign projects invoicing forms booking core', run: () => navigate('/settings/apps') },
     { id: 'ai-set', label: 'Settings: AI', icon: 'sparkles', keywords: 'pocket ai openai', run: () => navigate('/settings/ai') },
     { id: 'export', label: 'Settings: export your deals', icon: 'download', keywords: 'backup json csv', run: () => navigate('/settings/data') },
     { id: 'shortcuts', label: 'Keyboard shortcuts', icon: 'keyboard', hint: '?', run: () => setShortcuts(true) },

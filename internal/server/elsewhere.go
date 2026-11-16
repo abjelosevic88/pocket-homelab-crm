@@ -16,19 +16,21 @@ import (
 // ---- what the other apps know about a deal's person ----
 //
 // The emails exchanged with them (Pocket Mail), the meetings with them
-// (Pocket Calendar), the answers they sent to your forms (Pocket Forms) and
-// their invoices (Pocket Invoicing), read live and never stored. Each app is
+// (Pocket Calendar), the answers they sent to your forms (Pocket Forms),
+// their invoices (Pocket Invoicing) and the times they booked with you
+// (Pocket Booking), read live and never stored. Each app is
 // asked on its own: one that is missing or off only greys out its own part.
 
 type elseItem struct {
-	Kind   string `json:"kind"` // email | meeting | answer | invoice
+	Kind   string `json:"kind"` // email | meeting | answer | invoice | booking
 	Title  string `json:"title"`
 	Body   string `json:"body,omitempty"`
 	At     string `json:"at"`
 	URL    string `json:"url,omitempty"`
 	State  string `json:"state,omitempty"`
 	Amount string `json:"amount,omitempty"`
-	Out    bool   `json:"out,omitempty"` // an email you sent
+	Out    bool   `json:"out,omitempty"`  // an email you sent
+	Next   bool   `json:"next,omitempty"` // a booking: the next one coming up
 	Ref    string `json:"ref,omitempty"`
 }
 
@@ -62,6 +64,7 @@ func (s *Server) handleElsewhere(w http.ResponseWriter, r *http.Request) {
 		{appCalendar, func(ctx context.Context, sib *siblingConn) ([]elseItem, error) { return s.meetingsWith(ctx, sib, d) }, scopeCalendarRead, whyNot(d.ContactName == "" && d.ContactEmail == "" && d.Company == "", "say who the deal is with to see your meetings with them")},
 		{appForms, func(ctx context.Context, sib *siblingConn) ([]elseItem, error) { return s.answersFrom(ctx, sib, d) }, scopeFormsRead, whyNot(d.ContactEmail == "", "add their email to see what they sent to your forms")},
 		{appInvoicing, func(ctx context.Context, sib *siblingConn) ([]elseItem, error) { return s.invoicesFor(ctx, sib, d) }, scopeInvoicesRead, whyNot(d.Company == "" && d.ContactName == "", "say who the deal is with to see their invoices")},
+		{appBooking, func(ctx context.Context, sib *siblingConn) ([]elseItem, error) { return s.bookingsOf(ctx, sib, d) }, scopeBookingRead, whyNot(d.ContactEmail == "", "add their email to see the times they booked with you")},
 	}
 	out := make([]elseSection, len(jobs))
 	var wg sync.WaitGroup
@@ -204,6 +207,56 @@ func (s *Server) invoicesFor(ctx context.Context, sib *siblingConn, d *store.Dea
 		cents := int64(num(inv, "total")*100 + 0.5)
 		out = append(out, elseItem{Kind: "invoice", Title: "Invoice " + str(inv, "number"), At: firstNonEmpty(str(inv, "issue_date"), str(inv, "created_at")),
 			State: str(inv, "status"), Amount: fmtMoney(cents, firstNonEmpty(str(inv, "currency"), d.Currency)), URL: linkTo(sib, "/invoices/"+idOf(inv)), Ref: idOf(inv)})
+	}
+	return out, nil
+}
+
+// bookingsOf is the times the deal's person booked with you in Pocket
+// Booking (GET /lookup?email=): the ones coming up first, soonest first and
+// the next one marked, then the ones before, latest first.
+func (s *Server) bookingsOf(ctx context.Context, sib *siblingConn, d *store.Deal) ([]elseItem, error) {
+	v, err := getJSONFrom(ctx, sib, "/api/v1/lookup", url.Values{"email": {d.ContactEmail}})
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	seen := map[string]bool{}
+	var ahead, before []elseItem
+	for _, b := range append(rows(v, "upcoming"), rows(v, "bookings")...) {
+		id := idOf(b)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		start := str(b, "start")
+		end, err := time.Parse(time.RFC3339, firstNonEmpty(str(b, "end"), start))
+		title := firstNonEmpty(str(b, "title"), "A booking")
+		if e := str(b, "emoji"); e != "" {
+			title = e + " " + title
+		}
+		body := ""
+		if t := str(b, "time"); t != "" {
+			body = joinNonEmpty("–", t, str(b, "end_time"))
+		}
+		it := elseItem{Kind: "booking", Title: title, Body: body, At: start, State: str(b, "status"),
+			URL: firstNonEmpty(linkTo(sib, "/bookings/"+id), str(b, "url")), Ref: id}
+		if err == nil && end.After(now) {
+			ahead = append(ahead, it)
+		} else {
+			before = append(before, it)
+		}
+	}
+	sort.SliceStable(ahead, func(i, j int) bool { return ahead[i].At < ahead[j].At })
+	sort.SliceStable(before, func(i, j int) bool { return before[i].At > before[j].At })
+	for i := range ahead {
+		if st := ahead[i].State; st != "cancelled" && st != "declined" {
+			ahead[i].Next = true
+			break
+		}
+	}
+	out := append(ahead, before...)
+	if len(out) > 20 {
+		out = out[:20]
 	}
 	return out, nil
 }

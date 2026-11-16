@@ -39,6 +39,8 @@ const (
 	scopeInvoicesRead  = "invoices:read"
 	scopeInvoicesWrite = "invoices:write"
 	scopeFormsRead     = "forms:read"
+	scopeBookingRead   = "booking:read"
+	scopeBookingWrite  = "booking:write"
 )
 
 // pocketApp is one sibling Pocket app a deal can reach.
@@ -58,7 +60,8 @@ var (
 	appProjects  = pocketApp{"projects", "Pocket Projects", []string{scopeProjectsRead, scopeProjectsWrite}, "Start the project when a deal is won, with what was agreed as its description"}
 	appInvoicing = pocketApp{"invoicing", "Pocket Invoicing", []string{scopeInvoicesRead, scopeInvoicesWrite}, "Make a draft invoice when a deal is won, and show a client's invoices and what is paid on the deal"}
 	appForms     = pocketApp{"forms", "Pocket Forms", []string{scopeFormsRead}, "Turn answers to your forms (a brief, a quote request) into new leads"}
-	pocketApps   = []pocketApp{appContacts, appMail, appCalendar, appTasks, appNotes, appSign, appProjects, appInvoicing, appForms}
+	appBooking   = pocketApp{"booking", "Pocket Booking", []string{scopeBookingRead, scopeBookingWrite}, "Show the times a deal's person booked with you, and send them a personal booking link (their name and email filled in, the deal as the note)"}
+	pocketApps   = []pocketApp{appContacts, appMail, appCalendar, appTasks, appNotes, appSign, appProjects, appInvoicing, appForms, appBooking}
 )
 
 func appBySlug(slug string) (pocketApp, bool) {
