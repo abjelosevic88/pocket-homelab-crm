@@ -52,6 +52,7 @@ made_count, activities`. `contact_ref`/`company_ref` are card ids in Pocket Cont
 | `GET /apps/options/{teams\|templates\|booking-types}` | what to pick from in an app: Projects' teams, Sign's templates, Booking's open booking pages `[{id, name, emoji, durations, url}]` |
 | `GET /apps` | per linked app: `{slug, name, mode, via, state: on\|partly\|off\|link_off\|missing\|old\|no_core\|not_set_up\|error, detail, fix, on: [scopes], open_url}` |
 | `GET /export.json`, `GET /export.csv`, `POST /import` | a Pocket CRM export (idempotent) or a CSV from Pipedrive, HubSpot, Zoho or a spreadsheet |
+| `GET /pocket/portable` | what Pocket Move can copy out (the JSON and CSV exports, link scope `move:export`) and bring in (`POST /import`, `move:import`): Pocket Move can copy your deals out and bring deals in |
 
 Web pages: `/` (Today), `/pipeline`, `/deals`, `/deals/{id}`, `/people`, `/leads`, `/reports`.
 
